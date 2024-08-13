@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ARKANOID</title>
+
+    <style>
+        body {
+            background-color: #111;
+            margin: 0;
+            overflow: hidden; /* Evita barras de desplazamiento */
+        }
+
+        canvas {
+            border: 4px solid hsl(0, 62%, 42%);
+            border-bottom: transparent;
+            background: #000;
+            display: block;
+            margin: 0 auto;
+        }
+
+        .scoreboard {
+            color: #fff;
+            text-align: center;
+            font-family: Arial, sans-serif;
+            margin: 20px 0;
+        }
+
+        /* Controles táctiles */
+        .touch-controls {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: none; /* Ocultos por defecto */
+        }
+
+        .touch-controls button {
+            background: rgba(255, 255, 255, 0.3);
+            border: 1px solid #fff;
+            color: #fff;
+            font-size: 18px;
+            padding: 10px 20px;
+            margin: 0 5px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        @media (max-width: 767px) {
+            .touch-controls {
+                display: block; /* Mostrar controles táctiles en móviles */
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="scoreboard">
+        <span id="score">Puntuación: 0</span> | 
+        <span id="lives">Vidas: 3</span> | 
+        <span id="level">Nivel: 1</span>
+    </div>
+    <canvas></canvas>
+
+    <div class="touch-controls">
+        <button id="left">Izquierda</button>
+        <button id="right">Derecha</button>
+    </div>
+
+    <script>
+        const canvas = document.querySelector('canvas');
+        const ctx = canvas.getContext('2d');
+
+        // Ajustar el tamaño del canvas
+        canvas.width = window.innerWidth > 448 ? 448 : window.innerWidth;
+        canvas.height = window.innerHeight > 400 ? 400 : window.innerHeight;
+
+        let lives = 3;
+        let level = 1;
+        let counter = 0;
+
+        // Variables de la pelota
+        const ballRadius = 4;
+        let x = canvas.width / 2;
+        let y = canvas.height - 30;
+        let dx = 2;
+        let dy = -2;
+
+        // Variables de la paleta
+        const paddleHeight = 10;
+        const paddleWidth = 50;
+        let paddleX = (canvas.width - paddleWidth) / 2;
+        let rightPressed = false;
+        let leftPressed = false;
+
+        // Variables de los ladrillos
+        let brickRowCount = 5;
+        let brickColumnCount = 8;
+        const brickWidth = 48;
+        const brickHeight = 12;
+        const brickPadding = 8;
+        const brickOffsetTop = 30;
+        const brickOffsetLeft = 6;
+
+        let bricks = [];
+        function initBricks() {
+            bricks = [];
+            for (let c = 0; c < brickColumnCount; c++) {
+                bricks[c] = [];
+                for (let r = 0; r < brickRowCount; r++) {
+                    bricks[c][r] = { x: 0, y: 0, status: 1 };
+                }
+            }
+        }
+        initBricks();
+
+        function drawBall() {
+            ctx.beginPath();
+            ctx.arc(x, y, ballRadius, 0, Math.PI * 2);
+            ctx.fillStyle = '#339BFF';
+            ctx.fill();
+            ctx.closePath();
+        }
+
+        function drawPaddle() {
+            ctx.fillStyle = '#39FF14';
+            ctx.fillRect(paddleX, canvas.height - paddleHeight - 10, paddleWidth, paddleHeight);
+        }
+
+        function drawBricks() {
+            for (let c = 0; c < brickColumnCount; c++) {
+                for (let r = 0; r < brickRowCount; r++) {
+                    if (bricks[c][r].status === 1) {
+                        const brickX = c * (brickWidth + brickPadding) + brickOffsetLeft;
+                        const brickY = r * (brickHeight + brickPadding) + brickOffsetTop;
+                        bricks[c][r].x = brickX;
+                        bricks[c][r].y = brickY;
+                        ctx.beginPath();
+                        ctx.rect(brickX, brickY, brickWidth, brickHeight);
+                        ctx.fillStyle = '#FF5733';
+                        ctx.fill();
+                        ctx.closePath();
+                    }
+                }
+            }
+        }
+
+        function collisionDetection() {
+            for (let c = 0; c < brickColumnCount; c++) {
+                for (let r = 0; r < brickRowCount; r++) {
+                    const b = bricks[c][r];
+                    if (b.status === 1) {
+                        if (x > b.x && x < b.x + brickWidth && y > b.y && y < b.y + brickHeight) {
+                            dy = -dy;
+                            b.status = 0;
+                            counter++;
+                            if (counter === brickRowCount * brickColumnCount) {
+                                levelUp();
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        function levelUp() {
+            level++;
+            brickRowCount++;
+            initBricks();
+            x = canvas.width / 2;
+            y = canvas.height - 30;
+            dx += 1;
+            dy = -dy - 1;
+            paddleX = (canvas.width - paddleWidth) / 2;
+            document.getElementById('level').textContent = `Nivel: ${level}`;
+        }
+
+        function drawScore() {
+            document.getElementById('score').textContent = `Puntuación: ${counter}`;
+        }
+
+        function drawLives() {
+            document.getElementById('lives').textContent = `Vidas: ${lives}`;
+        }
+
+        function ballMovement() {
+            if (x + dx > canvas.width - ballRadius || x + dx < ballRadius) {
+                dx = -dx;
+            }
+            if (y + dy < ballRadius) {
+                dy = -dy;
+            } else if (y + dy > canvas.height - ballRadius) {
+                if (x > paddleX && x < paddleX + paddleWidth) {
+                    dy = -dy;
+                } else {
+                    lives--;
+                    drawLives();
+                    if (!lives) {
+                        alert('Game Over');
+                        document.location.reload();
+                    } else {
+                        x = canvas.width / 2;
+                        y = canvas.height - 30;
+                        dx = 2;
+                        dy = -2;
+                        paddleX = (canvas.width - paddleWidth) / 2;
+                    }
+                }
+            }
+            x += dx;
+            y += dy;
+        }
+
+        function paddleMovement() {
+            if (rightPressed && paddleX < canvas.width - paddleWidth) {
+                paddleX += 7;
+            } else if (leftPressed && paddleX > 0) {
+                paddleX -= 7;
+            }
+        }
+
+        function cleanCanvas() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+
+        function keyDownHandler(event) {
+            if (event.key === 'ArrowRight') {
+                rightPressed = true;
+            } else if (event.key === 'ArrowLeft') {
+                leftPressed = true;
+            }
+        }
+
+        function keyUpHandler(event) {
+            if (event.key === 'ArrowRight') {
+                rightPressed = false;
+            } else if (event.key === 'ArrowLeft') {
+                leftPressed = false;
+            }
+        }
+
+        function touchStartHandler(event) {
+            if (event.target.id === 'left') {
+                leftPressed = true;
+            } else if (event.target.id === 'right') {
+                rightPressed = true;
+            }
+        }
+
+        function touchEndHandler(event) {
+            if (event.target.id === 'left') {
+                leftPressed = false;
+            } else if (event.target.id === 'right') {
+                rightPressed = false;
+            }
+        }
+
+        function initEvents() {
+            document.addEventListener('keydown', keyDownHandler);
+            document.addEventListener('keyup', keyUpHandler);
+            document.querySelector('#left').addEventListener('touchstart', touchStartHandler);
+            document.querySelector('#right').addEventListener('touchstart', touchStartHandler);
+            document.querySelector('#left').addEventListener('touchend', touchEndHandler);
+            document.querySelector('#right').addEventListener('touchend', touchEndHandler);
+        }
+
+        function draw() {
+            cleanCanvas();
+            drawBall();
+            drawPaddle();
+            drawBricks();
+            drawScore();
+            collisionDetection();
+            ballMovement();
+            paddleMovement();
+            window.requestAnimationFrame(draw);
+        }
+
+        draw();
+        initEvents();
+
+        // Ajuste del tamaño del canvas en redimensionamientos
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth > 448 ? 448 : window.innerWidth;
+            canvas.height = window.innerHeight > 400 ? 400 : window.innerHeight;
+            paddleX = (canvas.width - paddleWidth) / 2;
+        });
+    </script>
+</body>
+</html>
